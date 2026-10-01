@@ -1,44 +1,50 @@
 <?php
 
-// Paksa PHP tampilkan semua error ke layar
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-try {
-    // 1. Buat / pastikan file SQLite di /tmp Vercel
-    $dbPath = '/tmp/database.sqlite';
-    if (!file_exists($dbPath)) {
-        if (file_exists(__DIR__ . '/../database/database.sqlite')) {
-            copy(__DIR__ . '/../database/database.sqlite', $dbPath);
-        } else {
-            touch($dbPath);
-        }
+// 1. Buat direktori sementara di /tmp untuk Storage, Cache, dan Logs Laravel
+$tmpDirs = [
+    '/tmp/storage/app',
+    '/tmp/storage/framework/cache',
+    '/tmp/storage/framework/sessions',
+    '/tmp/storage/framework/views',
+    '/tmp/storage/logs',
+    '/tmp/bootstrap/cache',
+];
+
+foreach ($tmpDirs as $dir) {
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
     }
-
-    // 2. Load autoload & app
-    require __DIR__ . '/../vendor/autoload.php';
-    $app = require_once __DIR__ . '/../bootstrap/app.php';
-
-    // 3. Eksekusi Request
-    $request = Request::capture();
-    $response = $app->handle($request);
-    $response->send();
-
-} catch (\Throwable $e) {
-    // Jika crash fatal, cetak detail error-nya dalam bentuk JSON
-    http_response_code(500);
-    header('Content-Type: application/json');
-    echo json_encode([
-        'error' => true,
-        'message' => $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine(),
-        'trace' => explode("\n", $e->getTraceAsString())
-    ], JSON_PRETTY_PRINT);
-    exit;
 }
+
+// 2. Set Environment Variables wajib untuk Read-Only Vercel
+$_ENV['APP_STORAGE_PATH'] = '/tmp/storage';
+$_ENV['LOG_CHANNEL'] = 'stderr';
+$_ENV['VIEW_COMPILED_PATH'] = '/tmp/storage/framework/views';
+
+// 3. Buat file SQLite di /tmp
+$dbPath = '/tmp/database.sqlite';
+if (!file_exists($dbPath)) {
+    if (file_exists(__DIR__ . '/../database/database.sqlite')) {
+        copy(__DIR__ . '/../database/database.sqlite', $dbPath);
+    } else {
+        touch($dbPath);
+    }
+}
+
+// 4. Load Autoload & Bootstrap Laravel
+require __DIR__ . '/../vendor/autoload.php';
+
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+// Timpa path storage & bootstrap cache bawaan ke /tmp
+$app->useStoragePath('/tmp/storage');
+$app->useBootstrapPath('/tmp/bootstrap');
+
+// 5. Eksekusi Request
+$request = Request::capture();
+$response = $app->handle($request);
+$response->send();
