@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Buat database sqlite kosong di /tmp Vercel jika belum ada
+// 1. Siapkan database SQLite di folder /tmp Vercel
 $dbPath = '/tmp/database.sqlite';
 if (!file_exists($dbPath)) {
     if (file_exists(__DIR__ . '/../database/database.sqlite')) {
@@ -14,9 +14,12 @@ if (!file_exists($dbPath)) {
     }
 }
 
+// 2. Load Autoload & Bootstrap Laravel 11
 require __DIR__ . '/../vendor/autoload.php';
+
 $app = require_once __DIR__ . '/../bootstrap/app.php';
 
+// 3. Tangani Request dan Kirim Response
 $request = Request::capture();
 $response = $app->handle($request);
 $response->send();
